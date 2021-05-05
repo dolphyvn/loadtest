@@ -1,0 +1,35 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tmp-script
+data:
+  load-test.sh: |-
+      #!/bin/sh
+      dd if=/dev/zero of=${MY_POD_NAME}.txt count=1024 bs=1048576
+      export NOW="$(date +%s)"
+      opts=$1
+      
+      for i in {1..$COUNT};
+        do
+          data=$(curl -s -w "total:%{time_total} dns:%{time_namelookup} connect:%{time_connect} pretransfer:%{time_pretransfer} starttransfer:%{time_starttransfer} uploadspeed:%{speed_upload}" -T ${MY_POD_NAME}.txt $1) 
+          upload_speed=$(echo $data|cut -d ' ' -f 6| cut -d ':' -f 2) 
+
+          key="100384:eyJrIjoiYjc0YTg1Y2UwZTU2ZWM1ZDRiOGE3MjhlOGNiODlmYTAzMmE3N2Q5ZiIsIm4iOiJkb2xwaHlfZ3JhIiwiaWQiOjQ5MjE1MH0="
+          graphite_login="100384:eyJrIjoiMTU1MGM3OGQ3NjExNGY4MGZiYjYwNTU5ZjJlM2M2YmYyNjdhZWUwNCIsIm4iOiJkb2xwaHkiLCJpZCI6NDkyMTUwfQ=="
+          prom_login="100383:eyJrIjoiMTU1MGM3OGQ3NjExNGY4MGZiYjYwNTU5ZjJlM2M2YmYyNjdhZWUwNCIsIm4iOiJkb2xwaHkiLCJpZCI6NDkyMTUwfQ=="
+          prom_url="https://prometheus-blocks-prod-us-central1.grafana.net/api/prom/push"
+          graphite_url="https://graphite-us-central1.grafana.net"
+          # Curl command
+
+
+          timestamp_now_rounded=$(($(date +%s) / 10 * 10))
+          timestamp_prev_rounded=$((timestamp_now_rounded - 10))
+
+          curl -X POST -H "Authorization: Bearer $key" -H "Content-Type: application/json" "$graphite_url/metrics" -d '[{
+              "name": "ebi.upload.speed.metric",
+              "interval": 10,
+              "value": '$upload_speed',
+              "time": '$timestamp_now_rounded'
+          }]'
+         done;
